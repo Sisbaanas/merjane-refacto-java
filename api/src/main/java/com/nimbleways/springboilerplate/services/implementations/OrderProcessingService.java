@@ -69,7 +69,7 @@ public class OrderProcessingService {
         productService.handleExpiredProduct(product);
     }
 
-    private boolean updateStock(Product product) {
+    protected boolean updateStock(Product product) {
         int updatedRows = productRepository.decrementStockIfAvailable(product.getId());
         return updatedRows > 0;
     }
