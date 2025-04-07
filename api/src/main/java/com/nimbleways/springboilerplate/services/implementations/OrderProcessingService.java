@@ -12,7 +12,7 @@ import java.util.Set;
 
 @Service
 @AllArgsConstructor
-public class OrderService {
+public class OrderProcessingService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
@@ -45,10 +45,10 @@ public class OrderService {
     }
 
     private void handleNormalProduct(Product product) {
-        if (product.getAvailable() > 0) {
-            updateStock(product);
-        } else if (product.getLeadTime() > 0) {
-            productService.notifyDelay(product.getLeadTime(), product);
+        if (!updateStock(product)) {
+            if (product.getLeadTime() > 0) {
+                productService.notifyDelay(product.getLeadTime(), product);
+            }
         }
     }
 
@@ -56,23 +56,21 @@ public class OrderService {
         LocalDate now = LocalDate.now();
         if (now.isAfter(product.getSeasonStartDate()) &&
                 now.isBefore(product.getSeasonEndDate()) &&
-                product.getAvailable() > 0) {
-            updateStock(product);
-        } else {
-            productService.handleSeasonalProduct(product);
+                updateStock(product)) {
+            return;
         }
+        productService.handleSeasonalProduct(product);
     }
 
     private void handleExpirableProduct(Product product) {
-        if (product.getAvailable() > 0 && product.getExpiryDate().isAfter(LocalDate.now())) {
-            updateStock(product);
-        } else {
-            productService.handleExpiredProduct(product);
+        if (product.getExpiryDate().isAfter(LocalDate.now()) && updateStock(product)) {
+            return;
         }
+        productService.handleExpiredProduct(product);
     }
 
-    private void updateStock(Product product) {
-        product.setAvailable(product.getAvailable() - 1);
-        productRepository.save(product);
+    private boolean updateStock(Product product) {
+        int updatedRows = productRepository.decrementStockIfAvailable(product.getId());
+        return updatedRows > 0;
     }
 }
